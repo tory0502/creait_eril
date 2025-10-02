@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SnapLink</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header>
+    <div class="container" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+      <h2 style="margin:0;color:#2d3748;">SnapLink · Find your photographer in Korea</h2>
+      <div class="auth">
+        <span id="auth-status" style="color:#718096;">Not logged in</span>
+        <input id="email" placeholder="email" />
+        <input id="password" placeholder="password" type="password" />
+        <button id="btn-login" class="btn-primary">Login</button>
+        <button id="btn-signup" class="btn-secondary">Signup U1</button>
+        <button id="btn-logout" class="btn-secondary" style="display:none;">Logout</button>
+      </div>
+    </div>
+  </header>
+  <div class="container">
+    <h1 class="page-title">Choose your photographer</h1>
+    
+    <div class="filters">
+      <input id="location" placeholder="촬영 장소 (Seoul/Busan)" />
+      <input id="date" type="date" />
+      <input id="time" type="time" />
+      <input id="budget" type="number" placeholder="Budget (USD)" />
+    </div>
+    
+    <div class="controls">
+      <select id="mood">
+        <option value="">Pick a mood</option>
+        <option value="film">Film</option>
+        <option value="portrait">Portrait</option>
+        <option value="vivid">Vivid</option>
+        <option value="landscape">Landscape</option>
+        <option value="warm">Warm</option>
+        <option value="bright">Bright</option>
+      </select>
+      <button id="search" class="btn-primary">추천순</button>
+      <button id="top" class="btn-secondary">리뷰높은순</button>
+    </div>
+
+    <div id="list" class="photographers-grid"></div>
+  </div>
+
+  <script src="/app.js"></script>
+  <script>
+    function timeBlocks(avails, queryDate) {
+      const blocks = [];
+      if (queryDate) {
+        const slots = ["09:00-11:00","10:00-12:00","14:00-16:00"];
+        slots.forEach(s => {
+          const [s1, s2] = s.split("-");
+          const found = (avails||[]).find(a => a.date === queryDate && a.start_time === s1 && a.end_time === s2);
+          blocks.push({label: s, ok: !!found});
+        });
+      }
+      return blocks;
+    }
+
+    function setAuthUI() {
+      const token = getToken();
+      const status = document.getElementById('auth-status');
+      const logoutBtn = document.getElementById('btn-logout');
+      const email = document.getElementById('email');
+      const pwd = document.getElementById('password');
+      const loginBtn = document.getElementById('btn-login');
+      const signupBtn = document.getElementById('btn-signup');
+      if (token) {
+        const uid = getUserIdFromToken();
+        status.textContent = `Logged in as #${uid}`;
+        email.style.display = 'none';
+        pwd.style.display = 'none';
+        loginBtn.style.display = 'none';
+        signupBtn.style.display = 'none';
+        logoutBtn.style.display = '';
+      } else {
+        status.textContent = 'Not logged in';
+        email.style.display = '';
+        pwd.style.display = '';
+        loginBtn.style.display = '';
+        signupBtn.style.display = '';
+        logoutBtn.style.display = 'none';
+      }
+    }
+
+    function render(list, sortByRating=false) {
+      const root = document.getElementById('list');
+      root.innerHTML = '';
+      if (sortByRating) {
+        list.sort((a,b) => {
+          const ar = (a.reviews?.length ? a.reviews.reduce((s,r)=>s+r.rating,0)/a.reviews.length : 0);
+          const br = (b.reviews?.length ? b.reviews.reduce((s,r)=>s+r.rating,0)/b.reviews.length : 0);
+          return br - ar;
+        });
+      }
+      const date = document.getElementById('date').value;
+      list.forEach(p => {
+        const item = document.createElement('div');
+        item.className = 'card';
+        const rating = (p.reviews?.length ? (p.reviews.reduce((s,r)=>s+r.rating,0)/p.reviews.length).toFixed(1) : '4.8');
+        const reviewCount = p.reviews?.length || 27;
+        const media = p.portfolios?.[0]?.media_url || 'https://picsum.photos/seed/placeholder/600/400';
+        const moods = p.moods ? p.moods.split(',').slice(0, 2) : ['film', 'portrait'];
+        
+        item.innerHTML = `
+          <img class="media" src="${media}" alt="cover" />
+          <div class="card-content">
+            <a class="photographer-name" href="/photographer.html?id=${p.id}">${p.user.name}</a>
+            <div class="description">${p.bio || 'Capturing beautiful moments with professional expertise'}</div>
+            <div class="stats">
+              <div class="rating">⭐ ${rating}</div>
+              <div class="reviews">(${reviewCount} reviews)</div>
+            </div>
+            <div class="price">$${p.base_price}</div>
+            <div class="instagram">@${p.instagram || 'photographer'}</div>
+            <div class="badges">
+              <span class="badge">${p.city}</span>
+              ${moods.map(mood => `<span class="badge">${mood.trim()}</span>`).join('')}
+            </div>
+            <div class="slots"></div>
+          </div>
+          <div class="heart" title="좋아요" data-id="${p.id}">🤍</div>
+        `;
+        
+        const slotsDiv = item.querySelector('.slots');
+        const blocks = timeBlocks(p.availabilities || [], date);
+        blocks.forEach(b => {
+          const span = document.createElement('span');
+          span.className = `slot ${b.ok ? 'slot-ok' : 'slot-no'}`;
+          span.textContent = b.label;
+          slotsDiv.appendChild(span);
+        });
+        
+        item.querySelector('.heart').addEventListener('click', async (e) => {
+          const userId = getUserIdFromToken();
+          if (!userId) { alert('로그인 후 이용해주세요'); return; }
+          const pid = e.currentTarget.getAttribute('data-id');
+          const heart = e.currentTarget;
+          
+          try {
+            await addFavorite(userId, pid);
+            heart.textContent = '❤️';
+            heart.classList.add('liked');
+            heart.style.background = '#ff6b6b';
+            heart.style.color = 'white';
+          } catch (error) {
+            console.error('Failed to add favorite:', error);
+          }
+        });
+        
+        root.appendChild(item);
+      });
+    }
+
+    async function search(sortByTop=false) {
+      const city = document.getElementById('location').value;
+      const mood = document.getElementById('mood').value;
+      const budget = document.getElementById('budget').value;
+      const params = {};
+      if (city) params.city = city;
+      if (mood) params.mood = mood;
+      if (budget) params.max_price = budget;
+      const list = await listPhotographers(params);
+      render(list, sortByTop);
+    }
+
+    document.getElementById('search').addEventListener('click', () => search(false));
+    document.getElementById('top').addEventListener('click', () => search(true));
+
+    document.getElementById('btn-login').addEventListener('click', async () => {
+      const email = document.getElementById('email').value || 'tourist@example.com';
+      const password = document.getElementById('password').value || 'Pass1234';
+      try {
+        await login(email, password);
+        setAuthUI();
+        alert('로그인 성공');
+      } catch { alert('로그인 실패'); }
+    });
+    document.getElementById('btn-signup').addEventListener('click', async () => {
+      const email = document.getElementById('email').value || `u${Math.floor(Math.random()*10000)}@ex.com`;
+      const password = document.getElementById('password').value || 'Pass1234';
+      try {
+        await signup(email, password, 'U1', email.split('@')[0]);
+        await login(email, password);
+        setAuthUI();
+        alert('회원가입 및 로그인 완료');
+      } catch { alert('회원가입 실패'); }
+    });
+    document.getElementById('btn-logout').addEventListener('click', () => {
+      localStorage.removeItem('token');
+      setAuthUI();
+    });
+
+    setAuthUI();
+    search();
+  </script>
+</body>
+</html>

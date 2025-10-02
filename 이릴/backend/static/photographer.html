@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Photographer Details</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .chat-container {
+      background: rgba(255,255,255,0.95);
+      border-radius: 20px;
+      padding: 20px;
+      margin-top: 20px;
+      backdrop-filter: blur(10px);
+    }
+    .chat-messages {
+      height: 300px;
+      overflow-y: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      background: #f8fafc;
+    }
+    .message {
+      margin-bottom: 12px;
+      padding: 8px 12px;
+      border-radius: 12px;
+      max-width: 80%;
+    }
+    .message.user {
+      background: linear-gradient(45deg, #667eea, #764ba2);
+      color: white;
+      margin-left: auto;
+    }
+    .message.bot {
+      background: white;
+      border: 1px solid #e2e8f0;
+      color: #2d3748;
+    }
+    .pricing-info {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+    .price-item {
+      background: rgba(255,255,255,0.9);
+      padding: 16px;
+      border-radius: 12px;
+      text-align: center;
+    }
+    .price-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: #2d3748;
+    }
+    .price-label {
+      color: #718096;
+      font-size: 14px;
+      margin-top: 4px;
+    }
+    .verified-badge {
+      background: linear-gradient(45deg, #48bb78, #38a169);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .menu-btn {
+      background: linear-gradient(45deg, #667eea, #764ba2);
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .menu-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+      <h2 style="margin:0;color:#2d3748;"><a class="link" href="/">← Back</a> Photographer Details</h2>
+    </div>
+  </header>
+  <div class="container">
+    <div id="profile" class="card"></div>
+    
+    <div class="pricing-info" id="pricing-info"></div>
+    
+    <div class="chat-container">
+      <h3 style="margin-top:0;color:#2d3748;">💬 Chat with Photographer</h3>
+      
+      <!-- Quick Menu Buttons -->
+      <div class="quick-menu" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+        <button class="menu-btn" data-query="refund policy" data-response="7일 전 취소 = 100% 환불, 3일 전 취소 = 50% 환불, 3일 이내 취소 = 환불 불가">💰 Refund Policy</button>
+        <button class="menu-btn" data-query="venue fee and equipment" data-response="장소비 및 장비 문의, 대관비는 1:1 지불">🏢 Venue & Equipment</button>
+        <button class="menu-btn" data-query="schedule changes" data-response="최소 7일 전까지만 변경 가능">📅 Schedule Changes</button>
+        <button class="menu-btn" data-query="direct contact" data-response="작가 직접 연락 010-1234-5678">📞 Direct Contact</button>
+      </div>
+      
+      <div class="chat-messages" id="chat-messages">
+        <div class="message bot">
+          <strong>Assistant:</strong> Hello! I'm here to help you with any questions about photography services, pricing, or booking. How can I assist you today?
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <input id="chat-input" placeholder="Ask about pricing, refund policy, equipment..." style="flex:1;padding:12px;border-radius:25px;border:1px solid #e2e8f0;" />
+        <select id="chat-lang" style="padding:12px;border-radius:25px;border:1px solid #e2e8f0;">
+          <option value="en">English</option>
+          <option value="ko">한국어</option>
+          <option value="ja">日本語</option>
+        </select>
+        <button id="chat-send" class="btn-primary">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+  <script>
+    function qs(name) { return new URLSearchParams(location.search).get(name); }
+
+    async function load() {
+      const id = qs('id');
+      if (!id) return;
+      const data = await fetch(`/api/photographers/${id}`).then(r=>r.json());
+      const rating = (data.reviews?.length ? (data.reviews.reduce((s,r)=>s+r.rating,0)/data.reviews.length).toFixed(1) : '4.8');
+      const media = data.portfolios?.[0]?.media_url || 'https://picsum.photos/seed/placeholder/600/400';
+      const moods = data.moods ? data.moods.split(',').slice(0, 2) : ['film', 'portrait'];
+      
+      const el = document.getElementById('profile');
+      el.innerHTML = `
+        <img class="media" src="${media}" alt="cover" />
+        <div class="card-content">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <a class="photographer-name" href="#">${data.user.name}</a>
+            ${data.instagram_verified ? '<span class="verified-badge">✓ Verified</span>' : ''}
+          </div>
+          <div class="description">${data.bio || 'Capturing beautiful moments with professional expertise'}</div>
+          <div class="stats">
+            <div class="rating">⭐ ${rating}</div>
+            <div class="reviews">(${data.reviews?.length || 27} reviews)</div>
+          </div>
+          <div class="instagram">@${data.instagram || 'photographer'}</div>
+          <div class="badges">
+            <span class="badge">${data.city}</span>
+            ${moods.map(mood => `<span class="badge">${mood.trim()}</span>`).join('')}
+          </div>
+        </div>
+      `;
+
+      // 가격 정보 표시
+      const pricingEl = document.getElementById('pricing-info');
+      pricingEl.innerHTML = `
+        <div class="price-item">
+          <div class="price-value">$${data.base_price}</div>
+          <div class="price-label">Base Photography</div>
+        </div>
+        <div class="price-item">
+          <div class="price-value">$${data.venue_fee || 0}</div>
+          <div class="price-label">Venue Fee</div>
+        </div>
+        <div class="price-item">
+          <div class="price-value">$${data.equipment_fee || 0}</div>
+          <div class="price-label">Equipment</div>
+        </div>
+        <div class="price-item">
+          <div class="price-value">$${(data.base_price + (data.venue_fee || 0) + (data.equipment_fee || 0))}</div>
+          <div class="price-label">Total Estimate</div>
+        </div>
+      `;
+    }
+
+    function addMessage(content, isUser = false) {
+      const messagesEl = document.getElementById('chat-messages');
+      const messageEl = document.createElement('div');
+      messageEl.className = `message ${isUser ? 'user' : 'bot'}`;
+      // \n\n을 <br><br>로, \n을 <br>로 변환하여 줄바꿈 표시
+      const formattedContent = content.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');
+      messageEl.innerHTML = `<strong>${isUser ? 'You' : 'Assistant'}:</strong> ${formattedContent}`;
+      messagesEl.appendChild(messageEl);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    document.getElementById('chat-send').addEventListener('click', async () => {
+      const input = document.getElementById('chat-input');
+      const text = input.value.trim();
+      const lang = document.getElementById('chat-lang').value;
+      
+      if (!text) return;
+      
+      // 사용자 메시지 표시 (원본)
+      addMessage(text, true);
+      input.value = '';
+      
+      try {
+        // 1. 번역 API 호출 (영어 → 한국어)
+        const translateResponse = await fetch('/api/chat/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: text,
+            target: 'ko' // 한국어로 번역
+          })
+        });
+        
+        const translateData = await translateResponse.json();
+        const translatedText = translateData.translated || text;
+        
+        // 2. 번역된 텍스트로 채팅 API 호출
+        const chatResponse = await fetch('/api/chat/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: translatedText,
+            photographer_id: qs('id'),
+            user_lang: 'ko'
+          })
+        });
+        
+        const chatData = await chatResponse.json();
+        
+        // 3. 봇 답변 표시
+        if (chatData.translated) {
+          addMessage(chatData.translated, false);
+        } else {
+          addMessage(chatData.response, false);
+        }
+        
+      } catch (error) {
+        console.error('Chat error:', error);
+        addMessage('죄송합니다. 응답에 문제가 있습니다. 나중에 다시 시도해주세요.');
+      }
+    });
+
+    document.getElementById('chat-input').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        document.getElementById('chat-send').click();
+      }
+    });
+
+    // 메뉴 버튼 클릭 이벤트
+    document.querySelectorAll('.menu-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const query = btn.getAttribute('data-query');
+        const response = btn.getAttribute('data-response');
+        
+        // 1. 사용자 메시지 표시
+        addMessage(query, true); // true = 사용자 메시지
+        
+        // 2. 잠시 후 봇 답변 표시
+        setTimeout(() => {
+          addMessage(response, false); // false = 봇 메시지
+        }, 500);
+      });
+    });
+
+    load();
+  </script>
+</body>
+</html>
